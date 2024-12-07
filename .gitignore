@@ -1,0 +1,25 @@
+*.pyc
+__pycache__/
+.env
+*.db
+venv/
+.idea/
+.vscode/
+temp_files/
+*.log
+old_*/
+# Дополнительные файлы баз данных
+*.sqlite
+*.sqlite3
+
+# Резервные копии
+*.bak
+*.backup
+
+# Excel временные файлы
+~$*.xlsx
+~$*.xls
+
+# Системные файлы
+.DS_Store
+Thumbs.db

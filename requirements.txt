@@ -1,0 +1,11 @@
+python-telegram-bot==13.14
+pandas
+apscheduler==3.6.3
+sqlalchemy==1.4.49
+urllib3==1.26.15
+python-dotenv
+psutil==5.9.5
+pytz
+email-validator
+alembic
+openpyxl
