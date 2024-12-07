@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Time, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Time, BigInteger
 
 from core.database import Base
 
@@ -6,7 +6,7 @@ from core.database import Base
 class Event(Base):
     __tablename__ = "events"
     event_id = Column(Integer, primary_key=True)
-    creator_id = Column(Integer, ForeignKey("users.user_id"))
+    creator_id = Column(BigInteger)  # это telegram_id создателя
     file_name = Column(String, nullable=False)
     event_name = Column(String, nullable=False)
     event_date = Column(DateTime, nullable=False)
@@ -16,5 +16,5 @@ class Event(Base):
     repeat_type = Column(String, nullable=True)
     remind_before = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True)
-    responsible_username = Column(String, nullable=True)
+    responsible_telegram_id = Column(BigInteger, nullable=True)  # Поле для ID ответственного
     responsible_email = Column(String, nullable=True)

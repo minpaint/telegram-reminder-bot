@@ -9,7 +9,6 @@ from models import Event
 
 logger = logging.getLogger(__name__)
 
-
 def process_excel(file_path, user_id, file_name):
     """Обработка Excel файла"""
     try:
@@ -32,7 +31,7 @@ def process_excel(file_path, user_id, file_name):
             "За сколько дней напомнить",
             "Повтор события",
             "Периодичность (мес)",
-            "Ответственный",
+            "ID ответственного",  # Название столбца для responsible_telegram_id
             "Email ответственного"
         ]
 
@@ -57,18 +56,25 @@ def process_excel(file_path, user_id, file_name):
                     time_str = str(row["Время наступления"]).strip().replace(".", ":")
                     event_time = datetime.strptime(time_str, "%H:%M").time()
 
+                    # Получаем telegram_id ответственного
+                    responsible_id = row["ID ответственного"]
+                    if pd.notna(responsible_id):
+                        responsible_id = int(responsible_id)
+                    else:
+                        responsible_id = None
+
                     # Создаем событие
                     event = Event(
                         creator_id=user_id,
                         file_name=file_name,
                         event_name=str(row["Событие"]).strip(),
-                        event_date=event_date.date(),  # Берем только дату
+                        event_date=event_date.date(),
                         event_time=event_time,
                         remind_before=int(row["За сколько дней напомнить"]),
                         repeat_type=str(row["Повтор события"]).strip(),
                         periodicity=int(row["Периодичность (мес)"]) if pd.notna(row["Периодичность (мес)"]) else 0,
-                        responsible_username=str(row["Ответственный"]).strip(),
                         responsible_email=str(row["Email ответственного"]).strip(),
+                        responsible_telegram_id=responsible_id,  # Используем ID ответственного
                         is_active=True
                     )
 
