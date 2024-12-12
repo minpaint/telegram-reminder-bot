@@ -19,63 +19,56 @@ class TelegramNotifier:
         days_left = (event.event_date - datetime.now()).days
 
         message = (
-            f"🔔 <b>Напоминание о событии</b>
-
-            "
-            f"📌 Событие: {event.event_name}
-            "
-            f"📅 Дата: {event.event_date.strftime('%d.%m.%Y')}
-            "
-            f"⏰ До события: {days_left} дней
-            "
+            f"🔔 <b>Напоминание о событии</b>\n\n"
+            f"📌 Событие: {event.event_name}\n"
+            f"📅 Дата: {event.event_date.strftime('%d.%m.%Y')}\n"
+            f"⏰ До события: {days_left} дней\n"
         )
 
         if event.periodicity:
-            message += f"🔄 Периодичность: {event.periodicity} мес.
+            message += f"🔄 Периодичность: {event.periodicity} мес.\n"
 
+        return message
 
-"
+    def send_notification(self, db, event):
+        """Отправка уведомления через Telegram"""
+        try:
+            message = self.format_message(event)
 
-return message
+            # Получаем список Telegram ID из поля responsible_telegram_ids
+            responsible_telegram_ids = event.responsible_telegram_ids.split(
+                ",") if event.responsible_telegram_ids else []
 
+            # Отправляем сообщение каждому получателю
+            for telegram_id in responsible_telegram_ids:
+                try:
+                    self.bot.send_message(
+                        chat_id=int(telegram_id),
+                        text=message,
+                        parse_mode='HTML'
+                    )
+                except TelegramError as e:
+                    logger.error(f"Ошибка отправки уведомления пользователю {telegram_id}: {e}")
 
-def send_notification(self, db, user_id, event):
-    """Отправка уведомления через Telegram"""
-    try:
-        message = self.format_message(event)
+            # Создаем запись об уведомлении
+            notification = Notification(
+                event_id=event.event_id,
+                user_id=event.creator_id,  # используем creator_id для связи
+                type=NotificationType.TELEGRAM,
+                scheduled_at=datetime.now()
+            )
 
-        # Создаем запись об уведомлении
-        notification = Notification(
-            event_id=event.event_id,
-            user_id=user_id,
-            type=NotificationType.TELEGRAM,
-            scheduled_at=datetime.now()
-        )
+            # Обновляем статус
+            notification.status = NotificationStatus.SENT
+            notification.sent_at = datetime.now()
 
-        # Пробуем отправить сообщение
-        self.bot.send_message(
-            chat_id=user_id,
-            text=message,
-            parse_mode='HTML'
-        )
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления: {e}")
+            if notification:
+                notification.status = NotificationStatus.FAILED
+                notification.error_message = str(e)
 
-        # Обновляем статус
-        notification.status = NotificationStatus.SENT
-        notification.sent_at = datetime.now()
-
-    except TelegramError as e:
-        logger.error(f"Telegram error for user {user_id}: {e}")
-        if notification:
-            notification.status = NotificationStatus.FAILED
-            notification.error_message = str(e)
-
-    except Exception as e:
-        logger.error(f"Error sending telegram notification: {e}")
-        if notification:
-            notification.status = NotificationStatus.FAILED
-            notification.error_message = str(e)
-
-    finally:
-        if notification:
-            db.add(notification)
-            db.commit()
+        finally:
+            if notification:
+                db.add(notification)
+                db.commit()

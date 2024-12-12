@@ -16,5 +16,5 @@ class Event(Base):
     repeat_type = Column(String, nullable=True)
     remind_before = Column(Integer, nullable=False)
     is_active = Column(Boolean, default=True)
-    responsible_telegram_id = Column(BigInteger, nullable=True)  # Поле для ID ответственного
+    responsible_telegram_ids = Column(BigInteger, nullable=True)  # Поле для ID ответственного
     responsible_email = Column(String, nullable=True)

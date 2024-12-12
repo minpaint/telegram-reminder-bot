@@ -1,108 +1,78 @@
 import os
-import re
+
+# Исправленные пути к файлам
+FILES_TO_EDIT = {
+    "services/excel/parser.py": [
+        {
+            "find": "event_date = row[1]",
+            "replace": """event_date = row["Дата наступления"]
+                   if not isinstance(event_date, datetime):
+                       event_date = datetime.strptime(str(event_date), "%Y-%m-%d")"""
+        },
+        {
+            "find": "time_str = str(row[2]).strip().replace(\".\", \":\")",
+            "replace": """time_str = str(row["Время наступления"]).strip().replace(".", ":")"""
+        },
+        {
+            "find": "responsible_ids_str = str(row[7]) if pd.notna(row[7]) else \"\"",
+            "replace": """responsible_ids_str = str(row["ID ответственных"]) if pd.notna(row["ID ответственных"]) else \"\""""
+        },
+        {
+            "find": "Event.event_name == str(row[0]).strip()",
+            "replace": """Event.event_name == str(row["Событие"]).strip()"""
+        },
+        {
+            "find": "logger.error(f\"Ошибка в строке {idx + 2}: {str(e)}\")",
+            "replace": """logger.error(f"Ошибка в строке {idx + 2} файла {file_name}: {str(e)}")"""
+        }
+    ],
+    "handlers/files.py": [
+        {
+            "find": "update.message.reply_text(\"Файл успешно обработан!\")",
+            "replace": """update.message.reply_text("Файл успешно обработан!")
+       except Exception as e:
+           logger.error(f"Ошибка при обработке файла: {str(e)}")
+           update.message.reply_text(f"❌ Ошибка при обработке файла: {str(e)}")"""
+        }
+    ]
+}
 
 
-def fix_main_py(file_path):
-    """Исправляет main.py"""
-    with open(file_path, 'r', encoding='utf-8') as file:
-        content = file.read()
+def edit_file(file_path, changes):
+    """
+    Редактирует файл, применяя указанные изменения.
+    :param file_path: Путь к файлу
+    :param changes: Список изменений
+    """
+    with open(file_path, "r", encoding="utf-8") as file:
+        content = file.readlines()
 
-    # Удаляем handle_new_date из импорта
-    content = re.sub(
-        r'from handlers\.commands import (.+), handle_new_date(.+)',
-        r'from handlers.commands import \1\2',
-        content
-    )
+    for change in changes:
+        find = change["find"]
+        replace = change["replace"]
+        for i, line in enumerate(content):
+            if find in line:
+                content[i] = line.replace(find, replace)
+                print(f"Изменение применено в файле {file_path} на строке {i + 1}")
+                break
+        else:
+            print(f"Не найдено изменение для строки '{find}' в файле {file_path}")
 
-    # Удаляем блок обработчика handle_new_date
-    content = re.sub(
-        r'\s*# Обработка ввода новой даты\s*dp\.add_handler$MessageHandler\(\s*Filters\.regex\(r\'\^\\\d{2}\.\\\d{2}\.\\\d{4}\$\'$,\s*handle_new_date\s*\)\)',
-        '',
-        content
-    )
-
-    with open(file_path, 'w', encoding='utf-8') as file:
-        file.write(content)
-
-
-def fix_init_py(file_path):
-    """Исправляет __init__.py"""
-    with open(file_path, 'r', encoding='utf-8') as file:
-        content = file.read()
-
-    # Удаляем handle_new_date из импорта
-    content = re.sub(
-        r'from \.commands import (.+), handle_new_date(.+)',
-        r'from .commands import \1\2',
-        content
-    )
-
-    # Удаляем handle_new_date из __all__
-    content = re.sub(
-        r"'handle_new_date',\s*",
-        '',
-        content
-    )
-
-    with open(file_path, 'w', encoding='utf-8') as file:
-        file.write(content)
-
-
-def fix_commands_py(file_path):
-    """Исправляет commands.py"""
-    with open(file_path, 'r', encoding='utf-8') as file:
-        content = file.read()
-
-    # Удаляем всю функцию handle_new_date
-    content = re.sub(
-        r'\ndef handle_new_date$update: Update, context: CallbackContext$:[\s\S]*?(?=\ndef|$)',
-        '\n',
-        content
-    )
-
-    with open(file_path, 'w', encoding='utf-8') as file:
-        file.write(content)
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.writelines(content)
 
 
 def main():
-    # Пути к файлам
-    base_path = os.getcwd()  # Текущая директория
-    main_path = os.path.join(base_path, 'main.py')
-    init_path = os.path.join(base_path, 'handlers', '__init__.py')
-    commands_path = os.path.join(base_path, 'handlers', 'commands.py')
-
-    # Проверяем существование файлов
-    files_to_check = [
-        (main_path, 'main.py'),
-        (init_path, 'handlers/__init__.py'),
-        (commands_path, 'handlers/commands.py')
-    ]
-
-    for file_path, file_name in files_to_check:
-        if not os.path.exists(file_path):
-            print(f"Ошибка: файл {file_name} не найден")
-            return
-
-    try:
-        # Создаем резервные копии
-        for file_path, file_name in files_to_check:
-            backup_path = file_path + '.backup'
-            with open(file_path, 'r', encoding='utf-8') as source:
-                with open(backup_path, 'w', encoding='utf-8') as backup:
-                    backup.write(source.read())
-            print(f"Создана резервная копия {file_name}")
-
-        # Вносим изменения
-        fix_main_py(main_path)
-        fix_init_py(init_path)
-        fix_commands_py(commands_path)
-
-        print("\nВсе изменения успешно внесены!")
-        print("Резервные копии файлов созданы с расширением .backup")
-
-    except Exception as e:
-        print(f"Произошла ошибка: {str(e)}")
-        print("Попробуйте восстановить файлы из резервных копий (.backup)")
+    """
+    Основная функция для применения изменений ко всем файлам.
+    """
+    for file_name, changes in FILES_TO_EDIT.items():
+        file_path = os.path.join(os.getcwd(), file_name)
+        if os.path.exists(file_path):
+            print(f"Обработка файла: {file_path}")
+            edit_file(file_path, changes)
+        else:
+            print(f"Файл {file_path} не найден")
 
 
 if __name__ == "__main__":
