@@ -18,7 +18,7 @@ def format_event_message(event, detailed=False):
         f"🗓 Дата: {event.event_date.strftime('%d.%m.%Y')}\n"
         f"⏰ Время: {event.event_time.strftime('%H:%M')}\n"
         f"🔁 Повтор: {event.repeat_type or 'Нет'}\n"
-        f"👤 Ответственный: @{event.responsible_username or 'не указан'}"
+        f"👤 Ответственный: @{event.responsible_telegram_ids.split(',')[0] if event.responsible_telegram_ids else 'не указан'}"
     )
 
     if detailed:
