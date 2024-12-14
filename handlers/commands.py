@@ -7,27 +7,9 @@ from telegram.ext import CallbackContext
 from core.database import SessionLocal
 from models import Event
 from .base import get_base_keyboard, format_event_message
-from .events import delete_event_request, update_event_request
 
 logger = logging.getLogger(__name__)
 
-
-def handle_menu_choice(update: Update, context: CallbackContext):
-    """Обработка выбора в меню"""
-    text = update.message.text
-
-    if text == "📂 Добавить файл":
-        handle_add_file(update, context)
-    elif text == "🔔 Напоминания":
-        reminders_command(update, context)
-    elif text == "📋 Мои события":
-        show_events(update, context)
-    elif text == "✏️ Изменить событие":
-        update_event_request(update, context)
-    elif text == "🗑 Удалить событие":
-        delete_event_request(update, context)
-    elif text == "🔄 Перезапустить":
-        restart_command(update, context)
 
 
 def start_command(update: Update, context: CallbackContext):
@@ -83,7 +65,7 @@ def show_events(update: Update, context: CallbackContext):
         events = db.query(Event).filter(
             Event.creator_id == user_id,
             Event.is_active == True
-        ).order_by(Event.file_name, Event.event_date).all()
+        ).all()
 
         if not events:
             update.message.reply_text("📭 У вас нет активных событий.")
@@ -91,6 +73,20 @@ def show_events(update: Update, context: CallbackContext):
 
         events_by_file = {}
         for event in events:
+            # Преобразуем дату к datetime с временем по умолчанию
+            if isinstance(event.event_date, str):
+                try:
+                    event.event_date = datetime.strptime(event.event_date, "%Y-%m-%d").replace(hour=0, minute=0,
+                                                                                               second=0)
+                except ValueError:
+                    try:
+                        event.event_date = datetime.strptime(event.event_date, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        try:
+                            event.event_date = datetime.strptime(event.event_date, "%d.%m.%Y")
+                        except ValueError as e:
+                            logger.error(f"Не удалось распарсить дату {event.event_date}, ошибка {e}")
+                            continue
             file_name = event.file_name or "Другие события"
             if file_name not in events_by_file:
                 events_by_file[file_name] = []
@@ -129,15 +125,6 @@ def show_events(update: Update, context: CallbackContext):
         update.message.reply_text("❌ Ошибка при получении списка событий")
     finally:
         db.close()
-
-
-def restart_command(update: Update, context: CallbackContext):
-    """Перезапуск бота"""
-    user_id = update.effective_user.id
-    message = "🔄 Бот перезапущен."
-    keyboard = get_base_keyboard(user_id)
-    update.message.reply_text(message, reply_markup=keyboard)
-
 
 def handle_add_file(update: Update, context: CallbackContext):
     """Обработка команды 'Добавить файл'"""

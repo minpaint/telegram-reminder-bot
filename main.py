@@ -2,16 +2,15 @@ import logging
 import os
 
 from dotenv import load_dotenv
+from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
 from handlers import (
-    start_command,
     show_events,
     reminders_command,
     delete_event_request,
     update_event_request,
     handle_add_file,
-    handle_menu_choice,
     handle_delete_callback,
     handle_update_callback,
     handle_document,
@@ -26,18 +25,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def start_command(update, context):
+    """Обработчик команды /start."""
+    keyboard = [
+        ["📋 Мои события", "🔔 Напоминания"],
+        ["📂 Добавить файл", "✏️ Изменить событие"],
+        ["🗑 Удалить событие"]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    update.message.reply_text(
+        "Добро пожаловать! Выберите действие:",
+        reply_markup=reply_markup
+    )
+
 def setup_handlers(dp):
     """Регистрация обработчиков"""
-    # Команды
+    # Команда /start
     dp.add_handler(CommandHandler("start", start_command))
 
-    # Обработка файлов
-    dp.add_handler(MessageHandler(
-        Filters.document.file_extension('xlsx'),
-        handle_document
-    ))
+    # Команды через слэш
+    dp.add_handler(CommandHandler("my_events", show_events))
+    dp.add_handler(CommandHandler("reminders", reminders_command))
+    dp.add_handler(CommandHandler("delete_event", delete_event_request))
+    dp.add_handler(CommandHandler("update_event", update_event_request))
+    dp.add_handler(CommandHandler("add_file", handle_add_file))
 
-    # Обработка текстовых команд
+    # Текстовые кнопки основного меню
     dp.add_handler(MessageHandler(
         Filters.regex('^📋 Мои события$'),
         show_events
@@ -59,6 +72,12 @@ def setup_handlers(dp):
         handle_add_file
     ))
 
+    # Обработка файлов
+    dp.add_handler(MessageHandler(
+        Filters.document.file_extension('xlsx'),
+        handle_document
+    ))
+
     # Обработка callback-запросов для кнопок
     dp.add_handler(CallbackQueryHandler(
         handle_delete_callback,
@@ -75,16 +94,12 @@ def setup_handlers(dp):
         handle_new_date
     ))
 
-    # Общий обработчик текстовых сообщений
-    dp.add_handler(MessageHandler(
-        Filters.text,
-        handle_menu_choice
-    ))
-
-
 def main():
     """Запуск бота"""
     TOKEN = os.getenv("TOKEN")
+    if not TOKEN:
+        raise ValueError("Токен бота отсутствует. Проверьте файл .env")
+
     updater = Updater(TOKEN, use_context=True)
 
     # Получаем диспетчер
@@ -99,7 +114,6 @@ def main():
 
     # Ожидаем завершения
     updater.idle()
-
 
 if __name__ == '__main__':
     load_dotenv()

@@ -3,7 +3,6 @@ from .commands import (
     show_events,
     reminders_command,
     handle_add_file,
-    handle_menu_choice
 )
 from .events import (
     delete_event_request,

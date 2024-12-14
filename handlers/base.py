@@ -8,7 +8,7 @@ def get_base_keyboard(user_id):
     keyboard = [
         [KeyboardButton("🔔 Напоминания"), KeyboardButton("📋 Мои события")],
         [KeyboardButton("📂 Добавить файл"), KeyboardButton("✏️ Изменить событие")],
-        [KeyboardButton("🗑 Удалить событие"), KeyboardButton("🔄 Перезапустить")]
+        [KeyboardButton("🗑 Удалить событие")]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
