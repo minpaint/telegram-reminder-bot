@@ -31,6 +31,7 @@ def reminders_command(update: Update, context: CallbackContext):
     """Показать активные напоминания"""
     user_id = update.effective_user.id
     current_date = datetime.now().date()
+    one_month_ahead = current_date + timedelta(days=30)  # ограничение на один месяц
     db = SessionLocal()
     try:
         overdue_events = db.query(Event).filter(
@@ -49,7 +50,8 @@ def reminders_command(update: Update, context: CallbackContext):
         all_future_events = db.query(Event).filter(
             Event.creator_id == user_id,
             Event.is_active == True,
-            Event.event_date > current_date
+            Event.event_date > current_date,
+            Event.event_date <= one_month_ahead
         ).order_by(Event.event_date).all()
 
         for event in all_future_events:
@@ -67,36 +69,59 @@ def reminders_command(update: Update, context: CallbackContext):
         message_parts = []
 
         if overdue_events:
-            message_parts.append("⚠️ Просроченные события:\n")
+            message_parts.append("<b>⚠️ Просроченные события:</b>\n")
+            grouped_overdue = {}
             for event in overdue_events:
-                days_overdue = (current_date - event.event_date.date()).days
-                message_parts.append(format_event_message(event))
-                message_parts.append(f"\nПросрочено на {days_overdue} дней\n\n")
+                grouped_overdue.setdefault(event.file_name, []).append(event)
+
+            for file_name, events in grouped_overdue.items():
+                message_parts.append(f"📁 {file_name}\n")
+                message_parts.append("━━━━━━━━━━━━━━━\n")
+                for event in events:
+                    event_date = event.event_date.strftime('%d.%m.%Y')
+                    message_parts.append(f"📅 {event.event_name}: {event_date}\n")
 
         if today_events:
-            message_parts.append("📅 События на сегодня:\n")
+            message_parts.append("<b>📅 События на сегодня:</b>\n")
+            grouped_today = {}
             for event in today_events:
-                message_parts.append(format_event_message(event) + "\n\n")
+                grouped_today.setdefault(event.file_name, []).append(event)
+
+            for file_name, events in grouped_today.items():
+                message_parts.append(f"📁 {file_name}\n")
+                message_parts.append("━━━━━━━━━━━━━━━\n")
+                for event in events:
+                    event_date = event.event_date.strftime('%d.%m.%Y')
+                    message_parts.append(f"📅 {event.event_name}: {event_date}\n")
 
         if upcoming_events:
-            message_parts.append("🔔 Приближающиеся события:\n")
+            message_parts.append("<b>🔔 Приближающиеся события:</b>\n")
+            grouped_upcoming = {}
             for event in upcoming_events:
-                days_left = (event.event_date.date() - current_date).days
-                message_parts.append(format_event_message(event))
-                message_parts.append(f"\nДо события: {days_left} дней\n\n")
+                grouped_upcoming.setdefault(event.file_name, []).append(event)
+
+            for file_name, events in grouped_upcoming.items():
+                message_parts.append(f"📁 {file_name}\n")
+                message_parts.append("━━━━━━━━━━━━━━━\n")
+                for event in events:
+                    event_date = event.event_date.strftime('%d.%m.%Y')
+                    days_left = (event.event_date.date() - current_date).days
+                    message_parts.append(f"📅 {event.event_name}: {event_date}\n")
+                    message_parts.append(f"До события: {days_left} дней\n")
 
         final_message = "".join(message_parts)
         if len(final_message) > 4096:
             for i in range(0, len(final_message), 4096):
-                update.message.reply_text(final_message[i:i + 4096])
+                update.message.reply_text(final_message[i:i + 4096], parse_mode='HTML')
         else:
-            update.message.reply_text(final_message)
+            update.message.reply_text(final_message, parse_mode='HTML')
 
     except Exception as e:
         logger.error(f"Ошибка при показе напоминаний: {e}")
         update.message.reply_text("❌ Ошибка при получении напоминаний")
     finally:
         db.close()
+
 
 def show_events(update: Update, context: CallbackContext):
     """Показ списка событий пользователя с группировкой по файлам"""
@@ -166,7 +191,6 @@ def show_events(update: Update, context: CallbackContext):
         update.message.reply_text("❌ Ошибка при получении списка событий")
     finally:
         db.close()
-
 
 def handle_add_file(update: Update, context: CallbackContext):
     """Обработка команды 'Добавить файл'"""
