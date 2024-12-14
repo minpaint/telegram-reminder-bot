@@ -9,7 +9,6 @@ from models import Event
 
 logger = logging.getLogger(__name__)
 
-
 def delete_event_request(update: Update, context: CallbackContext):
     """Запрос на удаление события с инлайн-кнопками"""
     user_id = update.effective_user.id
@@ -85,7 +84,6 @@ def delete_event_request(update: Update, context: CallbackContext):
     finally:
         db.close()
 
-
 def handle_delete_callback(update: Update, context: CallbackContext):
     """Обработка удаления события"""
     query = update.callback_query
@@ -115,9 +113,6 @@ def handle_delete_callback(update: Update, context: CallbackContext):
             query.edit_message_text("❌ Событие не найдено.")
     finally:
         db.close()
-
-
-# ... (предыдущий код остается без изменений)
 
 def update_event_request(update: Update, context: CallbackContext):
     """Запрос на обновление события с инлайн-кнопками"""
@@ -179,7 +174,6 @@ def update_event_request(update: Update, context: CallbackContext):
     finally:
         db.close()
 
-
 def handle_update_callback(update: Update, context: CallbackContext):
     """Обработка выбора события для обновления"""
     query = update.callback_query
@@ -224,7 +218,6 @@ def handle_update_callback(update: Update, context: CallbackContext):
     except Exception as e:
         logger.error(f"Ошибка при обработке callback обновления: {e}", exc_info=True)
         query.edit_message_text(text="❌ Произошла ошибка при обновлении события")
-
 
 def handle_new_date(update: Update, context: CallbackContext):
     """Обработка новой даты события"""

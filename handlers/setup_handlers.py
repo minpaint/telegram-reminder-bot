@@ -10,7 +10,6 @@ def setup_handlers(dispatcher):
 
     # Обработчики меню
     menu_handlers = [
-        MessageHandler(Filters.regex('^🔔 Напоминания$'), show_reminders),
         MessageHandler(Filters.regex('^📋 Мои события$'), show_events),
         MessageHandler(Filters.regex('^📂 Добавить файл$'), handle_add_file),
     ]
@@ -35,10 +34,6 @@ def help_command(update, context):
     )
 
 
-def show_reminders(update, context):
-    update.message.reply_text(
-        "Здесь будет список напоминаний"
-    )
 
 
 def show_events(update, context):

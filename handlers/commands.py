@@ -11,7 +11,6 @@ from .base import get_base_keyboard, format_event_message
 logger = logging.getLogger(__name__)
 
 
-
 def start_command(update: Update, context: CallbackContext):
     """Обработчик команды /start"""
     user = update.effective_user
@@ -29,33 +28,75 @@ def start_command(update: Update, context: CallbackContext):
 
 
 def reminders_command(update: Update, context: CallbackContext):
-    """Показ напоминаний"""
+    """Показать активные напоминания"""
     user_id = update.effective_user.id
-    now = datetime.now()
-    today_start = datetime(now.year, now.month, now.day)
-    today_end = today_start + timedelta(days=1)
-
+    current_date = datetime.now().date()
     db = SessionLocal()
     try:
-        events_today = db.query(Event).filter(
+        overdue_events = db.query(Event).filter(
             Event.creator_id == user_id,
-            Event.next_reminder >= today_start,
-            Event.next_reminder < today_end,
-            Event.is_active == True
-        ).all()
+            Event.is_active == True,
+            Event.event_date < current_date
+        ).order_by(Event.event_date).all()
 
-        message = "🔔 Напоминания на сегодня:\n\n"
+        today_events = db.query(Event).filter(
+            Event.creator_id == user_id,
+            Event.is_active == True,
+            Event.event_date == current_date
+        ).order_by(Event.event_date).all()
 
-        if not events_today:
-            message += "Нет активных напоминаний"
+        upcoming_events = []
+        all_future_events = db.query(Event).filter(
+            Event.creator_id == user_id,
+            Event.is_active == True,
+            Event.event_date > current_date
+        ).order_by(Event.event_date).all()
+
+        for event in all_future_events:
+            remind_date = event.event_date - timedelta(days=event.remind_before)
+            if current_date >= remind_date.date():
+                upcoming_events.append(event)
+
+        logger.info(
+            f"Найдено: просрочено - {len(overdue_events)}, сегодня - {len(today_events)}, предстоящих - {len(upcoming_events)}")
+
+        if not any([overdue_events, today_events, upcoming_events]):
+            update.message.reply_text("📭 Нет активных напоминаний")
+            return
+
+        message_parts = []
+
+        if overdue_events:
+            message_parts.append("⚠️ Просроченные события:\n")
+            for event in overdue_events:
+                days_overdue = (current_date - event.event_date.date()).days
+                message_parts.append(format_event_message(event))
+                message_parts.append(f"\nПросрочено на {days_overdue} дней\n\n")
+
+        if today_events:
+            message_parts.append("📅 События на сегодня:\n")
+            for event in today_events:
+                message_parts.append(format_event_message(event) + "\n\n")
+
+        if upcoming_events:
+            message_parts.append("🔔 Приближающиеся события:\n")
+            for event in upcoming_events:
+                days_left = (event.event_date.date() - current_date).days
+                message_parts.append(format_event_message(event))
+                message_parts.append(f"\nДо события: {days_left} дней\n\n")
+
+        final_message = "".join(message_parts)
+        if len(final_message) > 4096:
+            for i in range(0, len(final_message), 4096):
+                update.message.reply_text(final_message[i:i + 4096])
         else:
-            for event in events_today:
-                message += format_event_message(event) + "\n\n"
+            update.message.reply_text(final_message)
 
-        update.message.reply_text(message)
+    except Exception as e:
+        logger.error(f"Ошибка при показе напоминаний: {e}")
+        update.message.reply_text("❌ Ошибка при получении напоминаний")
     finally:
         db.close()
-
 
 def show_events(update: Update, context: CallbackContext):
     """Показ списка событий пользователя с группировкой по файлам"""
@@ -125,6 +166,7 @@ def show_events(update: Update, context: CallbackContext):
         update.message.reply_text("❌ Ошибка при получении списка событий")
     finally:
         db.close()
+
 
 def handle_add_file(update: Update, context: CallbackContext):
     """Обработка команды 'Добавить файл'"""
