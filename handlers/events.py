@@ -20,7 +20,7 @@ def delete_event_request(update: Update, context: CallbackContext):
         events = db.query(Event).filter(
             Event.creator_id == user_id,
             Event.is_active == True
-        ).order_by(Event.file_name, Event.event_date).all()
+        ).all()
 
         logger.info(f"Найдено {len(events)} событий")
 
@@ -30,6 +30,21 @@ def delete_event_request(update: Update, context: CallbackContext):
 
         events_by_file = {}
         for event in events:
+            # Преобразуем дату к datetime с временем по умолчанию
+            if isinstance(event.event_date, str):
+                try:
+                    event.event_date = datetime.strptime(event.event_date, "%Y-%m-%d").replace(hour=0, minute=0,
+                                                                                               second=0)
+                except ValueError:
+                    try:
+                        event.event_date = datetime.strptime(event.event_date, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        try:
+                            event.event_date = datetime.strptime(event.event_date, "%d.%m.%Y")
+                        except ValueError as e:
+                            logger.error(f"Не удалось распарсить дату {event.event_date}, ошибка {e}")
+                            continue
+
             try:
                 file_name = event.file_name or "Другие события"
                 if file_name not in events_by_file:

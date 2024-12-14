@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from telegram import ReplyKeyboardMarkup, KeyboardButton
 
 
@@ -13,10 +15,12 @@ def get_base_keyboard(user_id):
 
 def format_event_message(event, detailed=False):
     """Форматирование сообщения события"""
+    default_time = datetime.min.time()
+    event_time = event.event_date.time() if isinstance(event.event_date, datetime) else default_time
     base_message = (
         f"📅 Событие: {event.event_name}\n"
         f"🗓 Дата: {event.event_date.strftime('%d.%m.%Y')}\n"
-        f"⏰ Время: {event.event_time.strftime('%H:%M')}\n"
+        f"⏰ Время: {event_time.strftime('%H:%M')}\n"
         f"🔁 Повтор: {event.repeat_type or 'Нет'}\n"
         f"👤 Ответственный: @{event.responsible_telegram_ids.split(',')[0] if event.responsible_telegram_ids else 'не указан'}"
     )

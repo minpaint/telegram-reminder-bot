@@ -22,7 +22,7 @@ __all__ = [
     'handle_delete_callback',
     'update_event_request',
     'handle_update_callback',
-    'handle_new_date',  # Добавляем в __all__
+    'handle_new_date',
     'handle_add_file',
     'handle_menu_choice',
     'reminders_command'
