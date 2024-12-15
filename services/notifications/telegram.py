@@ -5,7 +5,7 @@ from telegram import Bot
 from telegram.error import TelegramError
 
 from config.settings import TOKEN
-from models import Notification, NotificationType, NotificationStatus
+from models.notification import Notification, NotificationType, NotificationStatus
 
 logger = logging.getLogger(__name__)
 

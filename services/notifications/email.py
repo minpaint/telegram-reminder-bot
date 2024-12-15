@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from config.settings import SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD
-from models import Notification, NotificationType, NotificationStatus
+from models.notification import Notification, NotificationType, NotificationStatus
 
 logger = logging.getLogger(__name__)
 

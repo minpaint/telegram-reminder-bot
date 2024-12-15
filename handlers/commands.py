@@ -1,15 +1,42 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
 
 from telegram import Update
 from telegram.ext import CallbackContext
 
 from core.database import SessionLocal
 from models import Event
-from .base import get_base_keyboard, format_event_message
+from .base import get_base_keyboard
 
 logger = logging.getLogger(__name__)
 
+
+def format_event_message(event, detailed=False):
+    """Форматирование сообщения события"""
+    default_time = datetime.min.time()
+    event_time = event.event_date.time() if isinstance(event.event_date, datetime) else default_time
+    base_message = (
+        f"📅 Событие: {event.event_name}\n"
+        f"🗓 Дата: {event.event_date.strftime('%d.%m.%Y')}\n"
+        f"⏰ Время: {event_time.strftime('%H:%M')}\n"
+        f"🔁 Повтор: {event.repeat_type or 'Нет'}\n"
+        f"👤 Ответственный: @{event.responsible_telegram_ids.split(',')[0] if event.responsible_telegram_ids else 'не указан'}"
+    )
+
+    if detailed:
+        extra_info = []
+        if event.responsible_email:
+            extra_info.append(f"📧 Email: {event.responsible_email}")
+        if event.repeat_type == "Ежемесячно":
+            extra_info.append(f"🔄 Периодичность: {event.periodicity} мес.")
+        if event.remind_before:
+            extra_info.append(f"⏰ Напомнить за {event.remind_before} дней")
+
+        if extra_info:
+            base_message += "\n" + "\n".join(extra_info)
+
+    return base_message
 
 def start_command(update: Update, context: CallbackContext):
     """Обработчик команды /start"""
@@ -69,7 +96,7 @@ def reminders_command(update: Update, context: CallbackContext):
         message_parts = []
 
         if overdue_events:
-            message_parts.append("<b>⚠️ Просроченные события:</b>\n")
+            message_parts.append("⚠️ Просроченные события:\n")
             grouped_overdue = {}
             for event in overdue_events:
                 grouped_overdue.setdefault(event.file_name, []).append(event)
@@ -82,7 +109,7 @@ def reminders_command(update: Update, context: CallbackContext):
                     message_parts.append(f"📅 {event.event_name}: {event_date}\n")
 
         if today_events:
-            message_parts.append("<b>📅 События на сегодня:</b>\n")
+            message_parts.append("📅 События на сегодня:\n")
             grouped_today = {}
             for event in today_events:
                 grouped_today.setdefault(event.file_name, []).append(event)
@@ -95,7 +122,7 @@ def reminders_command(update: Update, context: CallbackContext):
                     message_parts.append(f"📅 {event.event_name}: {event_date}\n")
 
         if upcoming_events:
-            message_parts.append("<b>🔔 Приближающиеся события:</b>\n")
+            message_parts.append("🔔 Приближающиеся события:\n")
             grouped_upcoming = {}
             for event in upcoming_events:
                 grouped_upcoming.setdefault(event.file_name, []).append(event)
@@ -105,9 +132,8 @@ def reminders_command(update: Update, context: CallbackContext):
                 message_parts.append("━━━━━━━━━━━━━━━\n")
                 for event in events:
                     event_date = event.event_date.strftime('%d.%m.%Y')
-                    days_left = (event.event_date.date() - current_date).days
                     message_parts.append(f"📅 {event.event_name}: {event_date}\n")
-                    message_parts.append(f"До события: {days_left} дней\n")
+                    message_parts.append(f"До события: {(event.event_date.date() - current_date).days} дней\n")
 
         final_message = "".join(message_parts)
         if len(final_message) > 4096:
@@ -191,6 +217,7 @@ def show_events(update: Update, context: CallbackContext):
         update.message.reply_text("❌ Ошибка при получении списка событий")
     finally:
         db.close()
+
 
 def handle_add_file(update: Update, context: CallbackContext):
     """Обработка команды 'Добавить файл'"""

@@ -12,6 +12,8 @@ from .events import (
     handle_new_date  # Добавляем импорт handle_new_date
 )
 from .files import handle_document
+from .manual_notifications import manual_notification_request, handle_manual_notification_callback
+
 
 __all__ = [
     'start_command',
@@ -23,5 +25,7 @@ __all__ = [
     'handle_update_callback',
     'handle_new_date',
     'handle_add_file',
-    'reminders_command'
+    'reminders_command',
+    'manual_notification_request',
+    'handle_manual_notification_callback'
 ]

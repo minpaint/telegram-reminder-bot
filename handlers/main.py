@@ -14,9 +14,9 @@ from handlers import (
     handle_delete_callback,
     handle_update_callback,
     handle_document,
-    handle_new_date
+    handle_new_date,
+    manual_notification_request
 )
-from handlers.main import handle_menu_choice
 
 # Настройка логирования
 logging.basicConfig(
@@ -58,6 +58,11 @@ def setup_handlers(dp):
         Filters.regex('^📂 Добавить файл$'),
         handle_add_file
     ))
+    # Обработка ручных уведомлений
+    dp.add_handler(MessageHandler(
+        Filters.regex('^📢 Отправить напоминание$'),
+        manual_notification_request
+    ))
 
     # Обработка callback-запросов для кнопок
     dp.add_handler(CallbackQueryHandler(
@@ -73,12 +78,6 @@ def setup_handlers(dp):
     dp.add_handler(MessageHandler(
         Filters.text & ~Filters.command,
         handle_new_date
-    ))
-
-    # Общий обработчик текстовых сообщений
-    dp.add_handler(MessageHandler(
-        Filters.text,
-        handle_menu_choice
     ))
 
 

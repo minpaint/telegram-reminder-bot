@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from core.database import SessionLocal
-from models import NotificationType, NotificationStatus
+from models.notification import NotificationType, NotificationStatus
 from services.notifications.email import EmailNotifier
 from services.notifications.telegram import TelegramNotifier
 

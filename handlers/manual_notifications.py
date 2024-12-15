@@ -1,22 +1,15 @@
 import logging
+from datetime import datetime
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 
 from core.database import SessionLocal
-from models import Event
-from services.scheduler.tasks import send_notification
+from models import Event, User, Notification, NotificationType, NotificationStatus
+from services.notifications.email import EmailNotifier
+from services.notifications.telegram import TelegramNotifier
 
 logger = logging.getLogger(__name__)
-
-def get_base_keyboard(user_id):
-    """Создание клавиатуры меню"""
-    keyboard = [
-        [KeyboardButton("🔔 Напоминания"), KeyboardButton("📋 Мои события")],
-        [KeyboardButton("📂 Добавить файл"), KeyboardButton("✏️ Изменить событие")],
-        [KeyboardButton("🗑 Удалить событие"), KeyboardButton("📢 Отправить напоминание")]
-    ]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
 def manual_notification_request(update: Update, context: CallbackContext):
@@ -89,17 +82,83 @@ def handle_manual_notification_callback(update: Update, context: CallbackContext
     if query.data.startswith("header"):
         return
 
+    db = SessionLocal()
     try:
         event_id = int(query.data.split('_')[-1])
         user_id = query.from_user.id
+
+        event = db.query(Event).filter(Event.event_id == event_id).first()
+        user = db.query(User).filter(User.user_id == user_id).first()
+
+        if not event or not user:
+            query.edit_message_text(f"❌ Событие или пользователь не найдены")
+            return
+
         logger.info(f"Ручная отправка напоминания для события {event_id}")
-        send_notification(event_id, user_id)
+
+        telegram_notifier = TelegramNotifier()
+        email_notifier = EmailNotifier()
+
+        message = f"""
+🔔 <b>Напоминание</b>
+
+Событие: {event.event_name}
+Дата: {event.event_date.strftime('%d.%m.%Y')}
+До события осталось: {(event.event_date - datetime.now()).days} дней
+"""
+
+        try:
+            telegram_notifier.send_notification(db, event)
+            notification = Notification(
+                user_id=user.user_id,
+                event_id=event.event_id,
+                type=NotificationType.TELEGRAM,
+                status=NotificationStatus.SENT,
+                sent_at=datetime.utcnow()
+            )
+            db.add(notification)
+            logger.info("Уведомление в телеграм отправлено")
+        except Exception as e:
+            notification = Notification(
+                user_id=user.user_id,
+                event_id=event.event_id,
+                type=NotificationType.TELEGRAM,
+                status=NotificationStatus.FAILED,
+                error_message=str(e)
+            )
+            db.add(notification)
+            logger.error(f"Ошибка отправки уведомления пользователю: {e}")
+
+        if user.email:
+            try:
+                email_notifier.send_notification(db, event)
+                notification = Notification(
+                    user_id=user.user_id,
+                    event_id=event.event_id,
+                    type=NotificationType.EMAIL,
+                    status=NotificationStatus.SENT,
+                    sent_at=datetime.utcnow()
+                )
+                db.add(notification)
+                logger.info("Уведомление на email отправлено")
+
+            except Exception as e:
+                notification = Notification(
+                    user_id=user.user_id,
+                    event_id=event.event_id,
+                    type=NotificationType.EMAIL,
+                    status=NotificationStatus.FAILED,
+                    error_message=str(e)
+                )
+                db.add(notification)
+                logger.error(f"Ошибка отправки уведомления на email: {e}")
+
+        db.commit()
         query.edit_message_text(f"✅ Напоминание для события {event_id} отправлено.")
         logger.info(f"Ручное уведомление для события {event_id} успешно отправлено")
-
-    except AttributeError as e:
-        logger.error(f"Ошибка при ручной отправке уведомления: {e}", exc_info=True)
-        query.edit_message_text(f"❌ Ошибка при отправке напоминания для события {event_id}.")
     except Exception as e:
-        logger.error(f"Ошибка при ручной отправке уведомления: {e}", exc_info=True)
+        db.rollback()
+        logger.error(f"Ошибка при ручной отправке уведомления: {e}")
         query.edit_message_text(f"❌ Ошибка при отправке напоминания для события {event_id}.")
+    finally:
+        db.close()

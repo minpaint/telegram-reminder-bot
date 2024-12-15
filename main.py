@@ -2,10 +2,10 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
 from handlers import (
+    start_command,
     show_events,
     reminders_command,
     delete_event_request,
@@ -14,7 +14,8 @@ from handlers import (
     handle_delete_callback,
     handle_update_callback,
     handle_document,
-    handle_new_date
+    handle_new_date,
+    manual_notification_request
 )
 
 # Настройка логирования
@@ -25,32 +26,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def start_command(update, context):
-    """Обработчик команды /start."""
-    keyboard = [
-        ["📋 Мои события", "🔔 Напоминания"],
-        ["📂 Добавить файл", "✏️ Изменить событие"],
-        ["🗑 Удалить событие"]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    update.message.reply_text(
-        "Добро пожаловать! Выберите действие:",
-        reply_markup=reply_markup
-    )
-
 def setup_handlers(dp):
     """Регистрация обработчиков"""
-    # Команда /start
+    # Команды
     dp.add_handler(CommandHandler("start", start_command))
 
-    # Команды через слэш
-    dp.add_handler(CommandHandler("my_events", show_events))
-    dp.add_handler(CommandHandler("reminders", reminders_command))
-    dp.add_handler(CommandHandler("delete_event", delete_event_request))
-    dp.add_handler(CommandHandler("update_event", update_event_request))
-    dp.add_handler(CommandHandler("add_file", handle_add_file))
+    # Обработка файлов
+    dp.add_handler(MessageHandler(
+        Filters.document.file_extension('xlsx'),
+        handle_document
+    ))
 
-    # Текстовые кнопки основного меню
+    # Обработка текстовых команд
     dp.add_handler(MessageHandler(
         Filters.regex('^📋 Мои события$'),
         show_events
@@ -71,11 +58,10 @@ def setup_handlers(dp):
         Filters.regex('^📂 Добавить файл$'),
         handle_add_file
     ))
-
-    # Обработка файлов
+    # Обработка ручных уведомлений
     dp.add_handler(MessageHandler(
-        Filters.document.file_extension('xlsx'),
-        handle_document
+        Filters.regex('^📢 Отправить напоминание$'),
+        manual_notification_request
     ))
 
     # Обработка callback-запросов для кнопок
@@ -94,12 +80,10 @@ def setup_handlers(dp):
         handle_new_date
     ))
 
+
 def main():
     """Запуск бота"""
     TOKEN = os.getenv("TOKEN")
-    if not TOKEN:
-        raise ValueError("Токен бота отсутствует. Проверьте файл .env")
-
     updater = Updater(TOKEN, use_context=True)
 
     # Получаем диспетчер
@@ -114,6 +98,7 @@ def main():
 
     # Ожидаем завершения
     updater.idle()
+
 
 if __name__ == '__main__':
     load_dotenv()
