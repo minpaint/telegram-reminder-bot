@@ -1,27 +1,23 @@
-from sqlalchemy import inspect
+import smtplib
 
-from core.database import engine, Base
+# Настройки
+smtp_server = "smtp.yandex.ru"
+smtp_port = 465
+smtp_user = "botnapominatel@yandex.ru"
+smtp_password = "c416bf317d03fe7338f86ff1ab35946d"  # ID пароля из скриншота
 
+try:
+    # Создаем подключение
+    print(f"Подключение к {smtp_server}:{smtp_port}")
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        # Включаем шифрование
+        print("Включение TLS")
+        server.starttls()
 
-def check_tables():
-    """Проверка существующих таблиц"""
-    inspector = inspect(engine)
-    existing_tables = inspector.get_table_names()
-    print("\nСуществующие таблицы:")
-    for table in existing_tables:
-        print(f"- {table}")
+        # Пытаемся залогиниться
+        print("Попытка входа...")
+        server.login(smtp_user, smtp_password)
+        print("Успешное подключение!")
 
-
-def init_database():
-    """Инициализация базы данных и создание всех таблиц"""
-    try:
-        # Создаем все таблицы
-        Base.metadata.create_all(bind=engine)
-        print("✅ База данных успешно инициализирована")
-        # Проверяем созданные таблицы
-        check_tables()
-    except Exception as e:
-        print(f"❌ Ошибка при инициализации базы данных: {e}")
-
-if __name__ == "__main__":
-    init_database()
+except Exception as e:
+    print(f"Ошибка: {str(e)}")

@@ -22,10 +22,13 @@ for dir_path in [EXCEL_TEMP_DIR, LOG_DIR, DATA_DIR]:
     os.makedirs(dir_path, exist_ok=True)
 
 # Email settings
-SMTP_SERVER = os.getenv("SMTP_SERVER")
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.yandex.ru")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME")
+SMTP_USER = os.getenv("SMTP_USER")  # Изменено с SMTP_USERNAME
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 
-__all__ = ['TOKEN', 'ADMIN_ID', 'DATABASE_URL',
-           'SMTP_SERVER', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD']
+__all__ = [
+    'TOKEN', 'ADMIN_ID', 'DATABASE_URL',
+    'SMTP_SERVER', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASSWORD', 'SENDER_EMAIL'
+]

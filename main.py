@@ -15,7 +15,8 @@ from handlers import (
     handle_update_callback,
     handle_document,
     handle_new_date,
-    manual_notification_request
+    manual_notification_request,
+    handle_manual_notification_callback
 )
 
 # Настройка логирования
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 def setup_handlers(dp):
     """Регистрация обработчиков"""
+
     # Команды
     dp.add_handler(CommandHandler("start", start_command))
 
@@ -42,36 +44,47 @@ def setup_handlers(dp):
         Filters.regex('^📋 Мои события$'),
         show_events
     ))
+
     dp.add_handler(MessageHandler(
         Filters.regex('^🔔 Напоминания$'),
         reminders_command
     ))
+
     dp.add_handler(MessageHandler(
         Filters.regex('^🗑 Удалить событие$'),
         delete_event_request
     ))
+
     dp.add_handler(MessageHandler(
         Filters.regex('^✏️ Изменить событие$'),
         update_event_request
     ))
+
     dp.add_handler(MessageHandler(
         Filters.regex('^📂 Добавить файл$'),
         handle_add_file
     ))
+
     # Обработка ручных уведомлений
     dp.add_handler(MessageHandler(
         Filters.regex('^📢 Отправить напоминание$'),
         manual_notification_request
     ))
 
-    # Обработка callback-запросов для кнопок
+    # Обработка callback-запросов
     dp.add_handler(CallbackQueryHandler(
         handle_delete_callback,
         pattern='^delete_'
     ))
+
     dp.add_handler(CallbackQueryHandler(
         handle_update_callback,
         pattern='^update_'
+    ))
+
+    dp.add_handler(CallbackQueryHandler(
+        handle_manual_notification_callback,
+        pattern='^manual_send_'
     ))
 
     # Обработка новой даты события
@@ -83,23 +96,52 @@ def setup_handlers(dp):
 
 def main():
     """Запуск бота"""
+    # Загружаем переменные окружения
+    load_dotenv()
+
+    # Получаем токен бота
     TOKEN = os.getenv("TOKEN")
-    updater = Updater(TOKEN, use_context=True)
+    if not TOKEN:
+        logger.error("Не найден токен бота в переменных окружения")
+        return
 
-    # Получаем диспетчер
-    dp = updater.dispatcher
+    try:
+        # Создаём updater
+        updater = Updater(TOKEN, use_context=True)
 
-    # Регистрируем обработчики
-    setup_handlers(dp)
+        # Получаем диспетчер
+        dp = updater.dispatcher
 
-    # Запускаем бота
-    updater.start_polling()
-    logger.info("Bot started")
+        # Регистрируем обработчики
+        setup_handlers(dp)
 
-    # Ожидаем завершения
-    updater.idle()
+        # Запускаем бота
+        updater.start_polling()
+        logger.info("✅ Бот успешно запущен")
 
+        # Выводим информацию о боте
+        bot_info = updater.bot.get_me()
+        logger.info(f"Имя бота: @{bot_info.username}")
+        logger.info(f"ID бота: {bot_info.id}")
+
+        # Ожидаем завершения
+        updater.idle()
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при запуске бота: {e}", exc_info=True)
+
+
+from services.notifications.email import EmailNotifier
+
+# Тестирование email настроек
+try:
+    email_notifier = EmailNotifier()
+    if email_notifier.test_connection():
+        logger.info("✅ Email настройки корректны")
+    else:
+        logger.error("❌ Ошибка настроек email")
+except Exception as e:
+    logger.error(f"❌ Ошибка инициализации email: {str(e)}")
 
 if __name__ == '__main__':
-    load_dotenv()
     main()
