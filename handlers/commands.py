@@ -152,72 +152,112 @@ def reminders_command(update: Update, context: CallbackContext):
 def show_events(update: Update, context: CallbackContext):
     """Показ списка событий пользователя с группировкой по файлам"""
     user_id = update.effective_user.id
+    logger.info(f"Запрос списка событий от пользователя {user_id}")
+
     db = SessionLocal()
     try:
         events = db.query(Event).filter(
             Event.creator_id == user_id,
             Event.is_active == True
-        ).all()
+        ).order_by(Event.file_name, Event.event_date).all()
 
         if not events:
-            update.message.reply_text("📭 У вас нет активных событий.")
+            update.message.reply_text(
+                "📭 У вас нет активных событий.\n"
+                "Используйте команду 'Добавить файл' для загрузки событий."
+            )
             return
 
+        # Группировка событий по файлам
         events_by_file = {}
         for event in events:
-            # Преобразуем дату к datetime с временем по умолчанию
-            if isinstance(event.event_date, str):
-                try:
-                    event.event_date = datetime.strptime(event.event_date, "%Y-%m-%d").replace(hour=0, minute=0,
-                                                                                               second=0)
-                except ValueError:
-                    try:
-                        event.event_date = datetime.strptime(event.event_date, "%Y-%m-%d %H:%M:%S")
-                    except ValueError:
-                        try:
-                            event.event_date = datetime.strptime(event.event_date, "%d.%m.%Y")
-                        except ValueError as e:
-                            logger.error(f"Не удалось распарсить дату {event.event_date}, ошибка {e}")
-                            continue
             file_name = event.file_name or "Другие события"
             if file_name not in events_by_file:
                 events_by_file[file_name] = []
             events_by_file[file_name].append(event)
 
-        message_parts = ["📋 Ваши события:\n\n"]
+        # Формирование сообщения
+        message_parts = []
 
-        if "Другие события" in events_by_file:
-            message_parts.append("📝 Другие события\n")
-            message_parts.append("━━━━━━━━━━━━━━━\n")
-            for event in sorted(events_by_file["Другие события"],
-                                key=lambda x: x.event_date):
-                message_parts.append(format_event_message(event) + "\n\n")
-            message_parts.append("\n")
-            del events_by_file["Другие события"]
-
+        # Обработка всех файлов
         for file_name, file_events in sorted(events_by_file.items()):
-            message_parts.append(f"📁 {file_name}\n")
-            message_parts.append("━━━━━━━━━━━━━━━\n")
+            message_parts.append(f"\n📁 {file_name}\n")
+            message_parts.append("━━━━━━━━━━━━━━━\n\n")
 
             for event in sorted(file_events, key=lambda x: x.event_date):
-                message_parts.append(format_event_message(event) + "\n\n")
+                days_left = (event.event_date.date() - datetime.now().date()).days
 
-            message_parts.append("\n")
+                # Определяем статус события
+                if days_left < 0:
+                    status = "⚠️"  # просрочено
+                elif days_left <= 3:
+                    status = "❗️"  # срочно
+                else:
+                    status = "📌"  # обычное
 
+                # Основная информация о событии
+                message_parts.append(
+                    f"{status} {event.event_name}\n"
+                    f"📅 {event.event_date.strftime('%d.%m.%Y')}"
+                )
+
+                # Добавляем количество дней, если событие не сегодня
+                if days_left != 0:
+                    if days_left < 0:
+                        message_parts.append(f" (просрочено на {abs(days_left)} дн.)")
+                    else:
+                        message_parts.append(f" (через {days_left} дн.)")
+
+                message_parts.append("\n")
+
+                # Дополнительная информация (без email)
+                if event.responsible_telegram_ids and event.responsible_telegram_ids != "@не указан":
+                    message_parts.append(f"👤 {event.responsible_telegram_ids}\n")
+                if event.repeat_type and event.repeat_type.lower() != "нет":
+                    message_parts.append(f"🔄 {event.repeat_type}")
+                    if event.periodicity:
+                        message_parts.append(f" ({event.periodicity} мес.)")
+                    message_parts.append("\n")
+
+                message_parts.append("\n")
+
+        # Добавляем статистику
+        total_events = len(events)
+        urgent_events = sum(1 for e in events if 0 <= (e.event_date.date() - datetime.now().date()).days <= 3)
+        overdue_events = sum(1 for e in events if (e.event_date.date() - datetime.now().date()).days < 0)
+
+        if total_events > 0:
+            stats = (
+                f"\n📊 Статистика:\n"
+                f"📌 Всего событий: {total_events}\n"
+            )
+            if urgent_events > 0:
+                stats += f"❗️ Срочных (≤3 дня): {urgent_events}\n"
+            if overdue_events > 0:
+                stats += f"⚠️ Просроченных: {overdue_events}\n"
+            message_parts.append(stats)
+
+        # Отправка сообщения
         final_message = "".join(message_parts)
 
+        # Разбиваем сообщение на части, если оно слишком длинное
         if len(final_message) > 4096:
             for i in range(0, len(final_message), 4096):
-                update.message.reply_text(final_message[i:i + 4096])
+                update.message.reply_text(
+                    final_message[i:i + 4096],
+                    parse_mode='HTML'
+                )
         else:
-            update.message.reply_text(final_message)
+            update.message.reply_text(final_message, parse_mode='HTML')
 
     except Exception as e:
         logger.error(f"Ошибка при показе событий: {e}", exc_info=True)
-        update.message.reply_text("❌ Ошибка при получении списка событий")
+        update.message.reply_text(
+            "❌ Произошла ошибка при получении списка событий.\n"
+            "Пожалуйста, попробуйте позже или обратитесь к администратору."
+        )
     finally:
         db.close()
-
 
 def handle_add_file(update: Update, context: CallbackContext):
     """Обработка команды 'Добавить файл'"""
